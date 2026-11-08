@@ -1,0 +1,4 @@
+pandas>=2.2
+scikit-learn==1.9.1  # même version que celle qui a entraîné data/modele.joblib
+streamlit>=1.40
+pytest>=8
