@@ -26,8 +26,9 @@ def charger():
     communes = pd.read_csv(DATA / "communes.csv", dtype={"code_commune": str, "departement": str})
     rapport = pd.read_csv(DATA / "rapport_nettoyage.csv")
     perf = json.loads((DATA / "performance.json").read_text(encoding="utf-8"))
+    alsace_moselle = json.loads((DATA / "alsace_moselle.geojson").read_text(encoding="utf-8"))
     communes["libelle"] = communes["nom_commune"] + " (" + communes["departement"] + ")"
-    return prix, communes.sort_values("libelle"), rapport, perf
+    return prix, communes.sort_values("libelle"), rapport, perf, alsace_moselle
 
 
 @st.cache_resource
@@ -40,7 +41,7 @@ def couleur(rang: float) -> list[int]:
     return [int(40 + 215 * rang), int(110 * (1 - abs(rang - 0.5) * 2) + 60), int(220 * (1 - rang) + 35), 170]
 
 
-prix, communes, rapport, perf = charger()
+prix, communes, rapport, perf, alsace_moselle = charger()
 st.title("Prix de l'immobilier en France")
 st.caption("Ventes de maisons et d'appartements 2021-2025 (DVF, DGFiP / Etalab), nettoyées et analysées en Python.")
 
@@ -59,15 +60,24 @@ with carte:
         rayon=np.sqrt(vue["nb_ventes"]) * 150,
         prix_txt=vue["prix_m2_median"].map(lambda v: f"{nb(v)} €/m²"),
     )
+    sans_donnees = [
+        pdk.Layer("GeoJsonLayer", alsace_moselle, get_fill_color=[150, 150, 150, 90],
+                  get_line_color=[90, 90, 90, 200], line_width_min_pixels=1),
+        pdk.Layer("TextLayer", [{"position": [6.9, 48.55], "texte": "Pas de données publiques\n(livre foncier)"}],
+                  get_position="position", get_text="texte", get_size=13, get_color=[60, 60, 60],
+                  character_set="auto"),
+    ]
     st.pydeck_chart(pdk.Deck(
-        layers=[pdk.Layer("ScatterplotLayer", vue, get_position=["longitude", "latitude"],
-                          get_fill_color="couleur", get_radius="rayon", radius_min_pixels=2, pickable=True)],
+        layers=sans_donnees + [pdk.Layer("ScatterplotLayer", vue, get_position=["longitude", "latitude"],
+                                         get_fill_color="couleur", get_radius="rayon", radius_min_pixels=2, pickable=True)],
         initial_view_state=pdk.ViewState(latitude=46.6, longitude=2.4, zoom=5),
         tooltip={"text": "{nom_commune} ({departement})\n{prix_txt} — {nb_ventes} ventes"},
         map_style=None,
     ), height=600)
     st.caption(f"{nb(len(vue))} communes avec au moins 5 ventes. Bleu : moins cher, rouge : plus cher. "
-               "La taille du point suit le nombre de ventes. Alsace, Moselle et Mayotte ne sont pas couvertes par DVF.")
+               "La taille du point suit le nombre de ventes. En gris : le Bas-Rhin, le Haut-Rhin et la Moselle "
+               "(Strasbourg, Mulhouse, Metz…), où les ventes sont inscrites au livre foncier, un registre de droit local "
+               "tenu par le ministère de la Justice et non publié en open data. Mayotte est aussi absente.")
 
     plus_cheres = vue.nlargest(10, "prix_m2_median")[["nom_commune", "departement", "prix_m2_median", "nb_ventes"]]
     st.subheader(f"Les 10 communes les plus chères ({type_bien.lower()}s, {annee})")
@@ -75,6 +85,7 @@ with carte:
                                              "nb_ventes": "Ventes"}).style.format({"Prix médian (€/m²)": nb}), hide_index=True)
 
 with evolution:
+    st.caption("Les communes du Bas-Rhin, du Haut-Rhin et de la Moselle n'apparaissent pas : leurs ventes ne sont pas publiées.")
     libelle = st.selectbox("Commune", communes["libelle"], index=int((communes["libelle"] == "Rennes (35)").argmax()))
     code = communes.loc[communes["libelle"] == libelle, "code_commune"].item()
     serie = prix[prix["code_commune"] == code]

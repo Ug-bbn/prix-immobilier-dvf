@@ -64,13 +64,15 @@ Les tests (`tests/test_preparation.py`) reproduisent les pièges de DVF sur un m
 
 ## Limites
 
-- DVF ne couvre ni l'Alsace, ni la Moselle, ni Mayotte (le livre foncier y est différent).
+- **Bas-Rhin, Haut-Rhin et Moselle (Strasbourg, Mulhouse, Metz…) :** les ventes y sont inscrites au livre foncier, un registre de droit local tenu par le ministère de la Justice. La DGFiP n'en dispose pas, et ces données ne sont pas ouvertes : elles ne se consultent que sur demande payante. Il n'existe donc aucune source libre pour ces départements. La carte les affiche en gris, avec une mention explicite, plutôt que de laisser un trou inexpliqué. Mayotte est également absente de DVF.
 - Paris, Lyon et Marseille sont détaillés par arrondissement.
 - Les données 2025 sont celles publiées en mai 2026. Le second semestre peut encore être complété.
 
 ## Sources
 
 - [Demandes de valeurs foncières géolocalisées — DGFiP / Etalab, data.gouv.fr](https://www.data.gouv.fr/datasets/demandes-de-valeurs-foncieres-geolocalisees)
+- [Pourquoi l'Alsace-Moselle est absente de DVF — FAQ de l'explorateur DVF, data.gouv.fr](https://explore.data.gouv.fr/fr/immobilier?onglet=faq)
+- Contours des départements : [france-geojson](https://github.com/gregoiredavid/france-geojson) (d'après l'IGN, version simplifiée)
 
 ---
 Hugues Barbier, data scientist Python freelance : automatisation Excel, ETL et fiabilisation de données.
