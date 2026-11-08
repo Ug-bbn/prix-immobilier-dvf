@@ -4,6 +4,8 @@
 
 > 🇬🇧 *An interactive Streamlit dashboard of French property prices built from 7 million raw sales records (DVF open data): a cleaning pipeline that documents every rule, a map of median prices per square metre for 24,000 municipalities, price trends, and a machine-learning estimator (scikit-learn) whose accuracy is measured honestly on unseen sales.*
 
+![Carte des prix médians au m² par commune, avec légende](docs/carte.png)
+
 ## Le problème
 
 L'État publie chaque vente immobilière de France sur [data.gouv.fr](https://www.data.gouv.fr/datasets/demandes-de-valeurs-foncieres-geolocalisees) : ce sont les Demandes de valeurs foncières (DVF), soit 7,3 millions de mutations entre 2021 et 2025. Calculer naïvement une moyenne sur ces données donne pourtant des résultats faux :
@@ -41,6 +43,8 @@ Le modèle est mesuré sur 300 000 ventes réelles qu'il n'a jamais vues :
 | Erreur médiane | 19,5 % |
 | Estimations à moins de 20 % du prix réel | 50,9 % |
 | Vrai prix compris dans la fourchette | 79,6 % (cible : 80 %) |
+
+![Estimation d'un appartement à Rennes, avec fourchette et fiabilité du modèle](docs/estimation.png)
 
 Le modèle ne connaît que la position, la surface, le nombre de pièces, le type de bien et l'année. Il ignore l'état du logement, l'étage, la vue ou le DPE. Il donne donc un ordre de grandeur, et l'application le dit clairement. Ce qui compte surtout, c'est que **la fourchette annoncée est fiable** : un test a révélé qu'une première version, pas assez régularisée, ne contenait le vrai prix que dans 59 % des cas, et je l'ai corrigée.
 
