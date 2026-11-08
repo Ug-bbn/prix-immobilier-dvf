@@ -3,6 +3,7 @@ from pathlib import Path
 
 import joblib
 import numpy as np
+import altair as alt
 import pandas as pd
 import pydeck as pdk
 import streamlit as st
@@ -36,9 +37,28 @@ def modele():
     return joblib.load(DATA / "modele.joblib")
 
 
-def couleur(rang: float) -> list[int]:
-    """Bleu (moins cher) -> rouge (plus cher), selon le rang du prix parmi les communes."""
-    return [int(40 + 215 * rang), int(110 * (1 - abs(rang - 0.5) * 2) + 60), int(220 * (1 - rang) + 35), 170]
+# Classes fixes en €/m² : les couleurs gardent le même sens d'une année et d'un type de bien à l'autre
+SEUILS = [1_500, 2_500, 3_500, 5_000, 8_000]
+PALETTE = ["#2c7bb6", "#00a6ca", "#90eb9d", "#f9d057", "#f29e2e", "#d7191c"]
+LIBELLES = [f"moins de {nb(SEUILS[0])} €"] + [f"{nb(a)} à {nb(b)} €" for a, b in zip(SEUILS, SEUILS[1:])]     + [f"plus de {nb(SEUILS[-1])} €"]
+
+
+def rgb(hexa: str, alpha: int = 190) -> list[int]:
+    return [int(hexa[i:i + 2], 16) for i in (1, 3, 5)] + [alpha]
+
+
+def legende(classes: pd.Series) -> str:
+    """Légende HTML : une pastille de couleur par classe de prix, avec le nombre de communes."""
+    comptes = classes.value_counts()
+    lignes = [f'<div style="display:flex;align-items:center;gap:8px;margin:5px 0">'
+              f'<span style="width:16px;height:16px;border-radius:50%;background:{c};flex:none"></span>'
+              f'<span>{lib}<br><small style="color:#888">{nb(comptes.get(i, 0))} communes</small></span></div>'
+              for i, (c, lib) in reversed(list(enumerate(zip(PALETTE, LIBELLES))))]
+    gris = ('<div style="display:flex;align-items:center;gap:8px;margin:12px 0 5px">'
+            '<span style="width:16px;height:16px;background:#bbb;border:1px solid #777;flex:none"></span>'
+            '<span>Pas de données publiques<br><small style="color:#888">Alsace-Moselle (livre foncier)</small></span></div>')
+    taille = '<p style="margin-top:12px"><small style="color:#888">Taille du point : nombre de ventes</small></p>'
+    return '<p style="font-weight:600;margin-bottom:4px">Prix médian au m²</p>' + "".join(lignes) + gris + taille
 
 
 prix, communes, rapport, perf, alsace_moselle = charger()
@@ -56,10 +76,11 @@ with carte:
     vue = prix[(prix["type"] == type_bien) & (prix["annee"] == annee)].merge(
         communes[["code_commune", "longitude", "latitude"]], on="code_commune")
     vue = vue.assign(
-        couleur=vue["prix_m2_median"].rank(pct=True).map(couleur),
+        classe=np.searchsorted(SEUILS, vue["prix_m2_median"], side="right"),
         rayon=np.sqrt(vue["nb_ventes"]) * 150,
         prix_txt=vue["prix_m2_median"].map(lambda v: f"{nb(v)} €/m²"),
     )
+    vue["couleur"] = vue["classe"].map(lambda i: rgb(PALETTE[i]))
     sans_donnees = [
         pdk.Layer("GeoJsonLayer", alsace_moselle, get_fill_color=[150, 150, 150, 90],
                   get_line_color=[90, 90, 90, 200], line_width_min_pixels=1),
@@ -67,15 +88,16 @@ with carte:
                   get_position="position", get_text="texte", get_size=13, get_color=[60, 60, 60],
                   character_set="auto"),
     ]
-    st.pydeck_chart(pdk.Deck(
+    col_legende, col_carte = st.columns([1, 5])
+    col_legende.markdown(legende(vue["classe"]), unsafe_allow_html=True)  # HTML généré ici, sans donnée utilisateur
+    col_carte.pydeck_chart(pdk.Deck(
         layers=sans_donnees + [pdk.Layer("ScatterplotLayer", vue, get_position=["longitude", "latitude"],
                                          get_fill_color="couleur", get_radius="rayon", radius_min_pixels=2, pickable=True)],
         initial_view_state=pdk.ViewState(latitude=46.6, longitude=2.4, zoom=5),
         tooltip={"text": "{nom_commune} ({departement})\n{prix_txt} — {nb_ventes} ventes"},
         map_style=None,
     ), height=600)
-    st.caption(f"{nb(len(vue))} communes avec au moins 5 ventes. Bleu : moins cher, rouge : plus cher. "
-               "La taille du point suit le nombre de ventes. En gris : le Bas-Rhin, le Haut-Rhin et la Moselle "
+    st.caption(f"{nb(len(vue))} communes avec au moins 5 ventes. En gris : le Bas-Rhin, le Haut-Rhin et la Moselle "
                "(Strasbourg, Mulhouse, Metz…), où les ventes sont inscrites au livre foncier, un registre de droit local "
                "tenu par le ministère de la Justice et non publié en open data. Mayotte est aussi absente.")
 
@@ -93,7 +115,14 @@ with evolution:
         st.info("Pas assez de ventes dans cette commune (au moins 5 par an et par type) pour publier un prix médian.")
     else:
         tableau = serie.pivot_table(index="annee", columns="type", values="prix_m2_median")
-        st.line_chart(tableau, x_label="Année", y_label="Prix médian (€/m²)")
+        donnees = tableau.reset_index().melt("annee", var_name="Type", value_name="prix").dropna()
+        st.altair_chart(alt.Chart(donnees).mark_line(point=True).encode(
+            x=alt.X("annee:O", title="Année", axis=alt.Axis(labelAngle=0)),
+            y=alt.Y("prix:Q", title="Prix médian (€/m²)",
+                    axis=alt.Axis(labelExpr="replace(format(datum.value, ',.0f'), /,/g, ' ')")),
+            color=alt.Color("Type:N", scale=alt.Scale(domain=["Appartement", "Maison"], range=["#2c7bb6", "#d7191c"])),
+            tooltip=[alt.Tooltip("annee:O", title="Année"), "Type", alt.Tooltip("prix:Q", title="€/m²", format=",.0f")],
+        ), width="stretch")
         for type_bien in tableau.columns:
             s = tableau[type_bien].dropna()
             if len(s) >= 2:
@@ -123,7 +152,7 @@ with estimation:
                      & (prix["annee"] == DERNIERE_ANNEE)]
     if not reference.empty:
         st.caption(f"Pour comparaison, prix médian constaté en {DERNIERE_ANNEE} à {commune['nom_commune']} : "
-                   f"{nb(reference['prix_m2_median'].item())} €/m² ({reference['nb_ventes'].item()} ventes).")
+                   f"{nb(reference['prix_m2_median'].item())} €/m² ({nb(reference['nb_ventes'].item())} ventes).")
 
     st.divider()
     st.markdown(
@@ -139,7 +168,7 @@ with qualite:
     st.write("Les données DVF brutes ne sont pas utilisables telles quelles. Une même vente apparaît sur plusieurs "
              "lignes, avec le prix répété sur chacune. Un immeuble entier peut être vendu en un seul prix, et certaines "
              "ventes sont symboliques (1 €). Chaque étape du nettoyage est comptée :")
-    tableau = rapport.pivot_table(index="etape", columns="annee", values="mutations", sort=False)
+    tableau = rapport.pivot_table(index="etape", columns="annee", values="mutations", sort=False).rename_axis("Étape")
     tableau["Part restante (2025)"] = (tableau[DERNIERE_ANNEE] / tableau[DERNIERE_ANNEE].iloc[0] * 100).map(lambda v: f"{nb(v, 1)} %")
     tableau.columns = tableau.columns.map(str)
     st.dataframe(tableau.style.format(nb, subset=[c for c in tableau.columns if c.isdigit()]))
