@@ -2,7 +2,9 @@
 
 ![tests](https://github.com/Ug-bbn/prix-immobilier-dvf/actions/workflows/tests.yml/badge.svg)
 
-> 🇬🇧 *An interactive Streamlit dashboard of French property prices built from 7 million raw sales records (DVF open data): a cleaning pipeline that documents every rule, a map of median prices per square metre for 24,000 municipalities, price trends, and a machine-learning estimator (scikit-learn) whose accuracy is measured honestly on unseen sales.*
+**▶ [Essayer l'application en ligne](https://prix-immo-france.streamlit.app/)**
+
+> 🇬🇧 *[Live demo](https://prix-immo-france.streamlit.app/). An interactive Streamlit dashboard of French property prices built from 7 million raw sales records (DVF open data): a cleaning pipeline that documents every rule, a map of median prices per square metre for 24,000 municipalities, price trends, and a machine-learning estimator (scikit-learn) whose accuracy is measured honestly on unseen sales.*
 
 ![Carte des prix médians au m² par commune, avec légende](docs/carte.png)
 
@@ -33,6 +35,8 @@ Le script produit ensuite :
 - un **modèle d'estimation** (gradient boosting, scikit-learn) entraîné sur 1,5 million de ventes. Il donne un prix et une fourchette (10e-90e centile).
 
 L'application Streamlit (`app.py`) propose quatre onglets : la carte des prix, l'évolution d'une commune, l'estimation d'un bien et le rapport de nettoyage.
+
+![Évolution du prix au m² à Rennes, appartements et maisons, 2021-2025](docs/evolution.png)
 
 ## Un modèle évalué honnêtement
 
